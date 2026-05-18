@@ -3,6 +3,17 @@
 输入一个已 Etherscan 验证的智能合约地址，AI 把它翻译成普通用户能看懂的中文说明：一句话总结、主要函数、关键状态变量、风险点、互动建议。
 
 > AI x Web3 School Cohort 0 · Week 1 AI 向任务（30 学分）。
+> **在线 Demo：<https://week1-contract-reader.vercel.app/>**
+
+## 效果预览
+
+| 真实合约解读 | Uniswap V2 Router |
+|---|---|
+| ![ERC20 + permit 合约解读](screenshots/01-result-mainnet-erc20-permit.png) | ![Uniswap V2 Router](screenshots/02-result-uniswap-v2-router.png) |
+
+| 导出的人工复核 Markdown | 移动端视图 |
+|---|---|
+| ![复核 Markdown](screenshots/03-review-export-markdown.png) | ![移动端单列折叠](screenshots/04-mobile-view.png) |
 
 ## 解决什么学习问题
 
