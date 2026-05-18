@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>合约可读化助手 · Week 1 Demo</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <h1>合约可读化助手</h1>
+      <p class="tagline">
+        粘贴一个 Etherscan 验证过的合约地址，AI 翻译成普通用户能看懂的中文。
+        数据流：你的浏览器 → Etherscan → LLM → 你的浏览器，<a href="SECURITY.md">无中间服务器</a>。
+      </p>
+    </div>
+  </header>
+
+  <main class="wrap layout">
+    <aside class="panel settings" id="settings">
+      <div class="panel-head">
+        <h2>设置</h2>
+        <button type="button" class="ghost" id="toggle-settings" aria-expanded="true" aria-controls="settings-body">收起</button>
+      </div>
+      <div class="panel-body" id="settings-body">
+        <label class="field">
+          <span class="field-label">LLM 提供方</span>
+          <select id="provider">
+            <option value="anthropic">Anthropic Claude</option>
+            <option value="openai">OpenAI GPT</option>
+            <option value="openai_compat">OpenAI 兼容（中转/国内）</option>
+          </select>
+        </label>
+
+        <label class="field" id="base-url-field" hidden>
+          <span class="field-label">
+            Endpoint URL
+            <a href="https://doc.zhizengzeng.com/doc-3979947" target="_blank" rel="noopener" class="field-link">智增增文档</a>
+          </span>
+          <input type="text" id="base-url" autocomplete="off" spellcheck="false" placeholder="https://api.zhizengzeng.com/v1/chat/completions">
+        </label>
+
+        <label class="field">
+          <span class="field-label">模型</span>
+          <select id="model"></select>
+        </label>
+
+        <label class="field">
+          <span class="field-label">LLM API Key</span>
+          <input type="password" id="llm-key" autocomplete="off" spellcheck="false" placeholder="sk-ant-... 或 sk-proj-...">
+        </label>
+
+        <label class="field">
+          <span class="field-label">
+            Etherscan API Key
+            <a href="https://etherscan.io/myapikey" target="_blank" rel="noopener" class="field-link">免费申请</a>
+          </span>
+          <input type="password" id="etherscan-key" autocomplete="off" spellcheck="false" placeholder="V2 起必填；或用「离线样本」跳过">
+        </label>
+
+        <label class="field">
+          <span class="field-label">网络</span>
+          <select id="network">
+            <option value="mainnet">Ethereum Mainnet</option>
+            <option value="sepolia">Sepolia Testnet</option>
+          </select>
+        </label>
+
+        <label class="check">
+          <input type="checkbox" id="persist">
+          <span>保存到本地 localStorage（公共电脑请勿勾选）</span>
+        </label>
+
+        <div class="actions">
+          <button type="button" class="danger ghost" id="clear-keys">清除全部 Key</button>
+        </div>
+
+        <p class="hint">
+          Key 仅存在你本地浏览器，不上传任何中间服务器。详见
+          <a href="SECURITY.md">SECURITY.md</a>。
+        </p>
+      </div>
+    </aside>
+
+    <section class="work">
+      <section class="panel">
+        <div class="panel-head"><h2>输入合约</h2></div>
+        <div class="panel-body">
+          <label class="field">
+            <span class="field-label">合约地址</span>
+            <input
+              type="text"
+              id="address"
+              inputmode="text"
+              autocapitalize="off"
+              spellcheck="false"
+              placeholder="0x..."
+              pattern="^0x[0-9a-fA-F]{40}$">
+          </label>
+
+          <div class="examples">
+            <span class="examples-label">示例：</span>
+            <button type="button" class="chip" data-example="usdc">USDC (Mainnet)</button>
+            <button type="button" class="chip" data-example="uniswap">Uniswap V2 Router (Mainnet)</button>
+            <button type="button" class="chip" data-example="sepolia-link">Sepolia LINK</button>
+          </div>
+
+          <div class="actions">
+            <button type="button" class="primary" id="run" disabled>解读合约</button>
+            <button type="button" class="ghost" id="run-sample" title="跳过 Etherscan 直接用离线样本数据">使用离线样本</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="status-panel" hidden>
+        <div class="panel-head"><h2>进度</h2></div>
+        <div class="panel-body">
+          <ol class="steps">
+            <li id="step-validate"><span class="dot"></span>地址校验</li>
+            <li id="step-fetch"><span class="dot"></span>拉取源码 / ABI</li>
+            <li id="step-llm"><span class="dot"></span>调用 LLM</li>
+            <li id="step-render"><span class="dot"></span>渲染结果</li>
+          </ol>
+          <p class="status-msg" id="status-msg"></p>
+        </div>
+      </section>
+
+      <section class="panel" id="result-panel" hidden>
+        <div class="panel-head">
+          <h2>解读结果</h2>
+          <div class="result-actions">
+            <button type="button" class="ghost" id="copy-md">复制 Markdown</button>
+            <button type="button" class="ghost" id="download-md">下载 .md</button>
+            <button type="button" class="ghost" id="export-review">导出复核 Markdown</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div id="cards"></div>
+
+          <details class="raw">
+            <summary>原始合约元数据（点击展开）</summary>
+            <pre id="raw-meta"></pre>
+          </details>
+
+          <p class="disclaimer">
+            ⚠️ 以上内容由 AI 生成，可能存在错误或遗漏。重要决策前请阅读源码或咨询审计专家。
+          </p>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <footer class="bottom">
+    <div class="wrap">
+      <span>Week 1 · AI x Web3 School Cohort 0</span>
+      <a href="https://aiweb3.school/zh/handbook/" target="_blank" rel="noopener">Handbook</a>
+    </div>
+  </footer>
+
+  <template id="card-tpl">
+    <article class="card">
+      <header class="card-head">
+        <h3 class="card-title"></h3>
+        <div class="review">
+          <label><input type="radio" name="r-X" value="ai"> AI 推断</label>
+          <label><input type="radio" name="r-X" value="verified"> 已比对源码</label>
+          <label><input type="radio" name="r-X" value="doubt"> 存疑</label>
+        </div>
+      </header>
+      <div class="card-body"></div>
+    </article>
+  </template>
+
+  <script type="module" src="script.js?v=5"></script>
+</body>
+</html>
